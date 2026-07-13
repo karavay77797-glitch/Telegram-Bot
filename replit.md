@@ -1,36 +1,43 @@
-# [Project name]
+# Music Submission Bot
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+A Telegram bot that lets users submit music tracks for review. The owner approves or rejects each submission via inline buttons, and approved tracks are published automatically to a Telegram channel.
 
 ## Run & Operate
 
+- **Start the bot:** use the "Music Submission Bot" workflow (runs `cd bot && python main.py`)
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
 
+- Python 3.11 + python-telegram-bot v21.9 (async)
 - pnpm workspaces, Node.js 24, TypeScript 5.9
 - API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+```
+bot/
+  main.py        — entry point, Application setup & handler registration
+  handlers.py    — all conversation steps + owner approval callbacks
+  config.py      — env var loading & conversation state constants
+  requirements.txt
+```
 
-## Architecture decisions
+## Bot flow
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+1. User sends `/start` → guided through: music file or link → title → artist → optional comment
+2. Submission forwarded to owner with **Approve / Reject** buttons
+3. Owner taps Approve → music published to channel; owner taps Reject → user notified
 
-## Product
+## Required Secrets
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+| Secret | Description |
+|---|---|
+| `BOT_TOKEN` | From @BotFather |
+| `OWNER_CHAT_ID` | Owner's numeric Telegram ID |
+| `CHANNEL_ID` | Channel username (`@chan`) or numeric ID |
 
 ## User preferences
 
@@ -38,8 +45,11 @@ _Populate as you build — explicit user instructions worth remembering across s
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- `OWNER_CHAT_ID` must be a plain integer (the bot casts `os.environ["OWNER_CHAT_ID"]` to `int`)
+- The bot must be an **admin** of the target channel with "Post messages" permission for publishing to work
+- The owner must have started a conversation with the bot at least once before approval notifications can be sent
 
 ## Pointers
 
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- See `bot/README.md` for quick-start instructions
+- See the `pnpm-workspace` skill for workspace structure
