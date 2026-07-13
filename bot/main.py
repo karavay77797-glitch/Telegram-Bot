@@ -14,6 +14,7 @@ from telegram.ext import (
 from config import (
     BOT_TOKEN,
     WAITING_FOR_MUSIC,
+    WAITING_FOR_IMAGE,
     WAITING_FOR_TITLE,
     WAITING_FOR_ARTIST,
     WAITING_FOR_COMMENT,
@@ -21,6 +22,8 @@ from config import (
 from handlers import (
     start,
     receive_music,
+    receive_image,
+    skip_image,
     receive_title,
     receive_artist,
     receive_comment,
@@ -49,6 +52,10 @@ def main() -> None:
                     filters.AUDIO | filters.Document.ALL | filters.TEXT & ~filters.COMMAND,
                     receive_music,
                 ),
+            ],
+            WAITING_FOR_IMAGE: [
+                CommandHandler("skip", skip_image),
+                MessageHandler(filters.PHOTO | filters.Document.IMAGE, receive_image),
             ],
             WAITING_FOR_TITLE: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_title),

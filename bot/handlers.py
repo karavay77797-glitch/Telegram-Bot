@@ -1,7 +1,6 @@
 """Conversation handlers for the music submission bot."""
 
 import logging
-import os
 from telegram import (
     Update,
     InlineKeyboardButton,
@@ -14,6 +13,7 @@ from config import (
     OWNER_CHAT_ID,
     CHANNEL_ID,
     WAITING_FOR_MUSIC,
+    WAITING_FOR_IMAGE,
     WAITING_FOR_TITLE,
     WAITING_FOR_ARTIST,
     WAITING_FOR_COMMENT,
@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 # ──────────────────────────────────────────────
 
 def _is_allowed_audio(document) -> bool:
-    """Return True if the document looks like an allowed audio file."""
     if document is None:
         return False
     mime = (document.mime_type or "").lower()
@@ -39,21 +38,36 @@ def _is_allowed_audio(document) -> bool:
     return any(name.endswith(ext) for ext in ALLOWED_AUDIO_EXT)
 
 
-def _submission_summary(data: dict) -> str:
-    lines = [
-        "🎵 <b>Нова заявка на музику</b>",
-        "",
-        f"🎼 <b>Назва:</b> {data.get('title', '—')}",
-        f"🎤 <b>Виконавець:</b> {data.get('artist', '—')}",
-    ]
+def _submission_caption(data: dict) -> str:
+    """Build the caption shown to the owner and published to the channel."""
+    lines = ["🎵 <b>Нова заявка на музику</b>", ""]
+    lines.append(f"🎵 <b>Трек:</b> {data.get('title', '—')}")
+    lines.append(f"👤 <b>Виконавець:</b> {data.get('artist', '—')}")
     comment = data.get("comment")
     if comment:
         lines.append(f"💬 <b>Коментар:</b> {comment}")
+    link = data.get("link")
+    if link:
+        lines.append(f"🔗 <b>Посилання:</b> {link}")
     user = data.get("user")
     if user:
         name = user.full_name
         username = f" (@{user.username})" if user.username else ""
         lines.append(f"👤 <b>Від:</b> {name}{username} [<code>{user.id}</code>]")
+    return "\n".join(lines)
+
+
+def _channel_caption(data: dict) -> str:
+    """Shorter caption for the public channel post (no sender info)."""
+    lines = []
+    lines.append(f"🎵 <b>{data.get('title', '—')}</b>")
+    lines.append(f"👤 {data.get('artist', '—')}")
+    comment = data.get("comment")
+    if comment:
+        lines.append(f"💬 {comment}")
+    link = data.get("link")
+    if link:
+        lines.append(f"🔗 {link}")
     return "\n".join(lines)
 
 
@@ -89,7 +103,6 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 async def receive_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     message = update.message
 
-    # Audio attachment (Telegram audio or document)
     if message.audio:
         context.user_data["music_type"] = "audio"
         context.user_data["file_id"] = message.audio.file_id
@@ -99,7 +112,6 @@ async def receive_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         context.user_data["file_id"] = message.document.file_id
         context.user_data["file_name"] = message.document.file_name or "audio"
     elif message.text:
-        # Accept any text as a link
         context.user_data["music_type"] = "link"
         context.user_data["link"] = message.text.strip()
     else:
@@ -110,14 +122,49 @@ async def receive_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         return WAITING_FOR_MUSIC
 
     await message.reply_text(
-        "🎼 Отримано! Тепер введіть <b>назву треку</b>.",
+        "🖼 Тепер надішліть <b>обкладинку треку</b> (фото).\n"
+        "Або надішліть /skip, щоб пропустити цей крок.",
+        parse_mode=ParseMode.HTML,
+    )
+    return WAITING_FOR_IMAGE
+
+
+# ──────────────────────────────────────────────
+# Step 2 – Cover image (optional)
+# ──────────────────────────────────────────────
+
+async def receive_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    message = update.message
+
+    if message.photo:
+        # Use the highest-resolution version
+        context.user_data["image_file_id"] = message.photo[-1].file_id
+    elif message.document:
+        context.user_data["image_file_id"] = message.document.file_id
+    else:
+        await message.reply_text(
+            "⚠️ Будь ласка, надішліть фото або зображення, або /skip щоб пропустити."
+        )
+        return WAITING_FOR_IMAGE
+
+    await message.reply_text(
+        "🎼 Чудово! Тепер введіть <b>назву треку</b>.",
+        parse_mode=ParseMode.HTML,
+    )
+    return WAITING_FOR_TITLE
+
+
+async def skip_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data.pop("image_file_id", None)
+    await update.message.reply_text(
+        "🎼 Гаразд, без обкладинки. Введіть <b>назву треку</b>.",
         parse_mode=ParseMode.HTML,
     )
     return WAITING_FOR_TITLE
 
 
 # ──────────────────────────────────────────────
-# Step 2 – Title
+# Step 3 – Title
 # ──────────────────────────────────────────────
 
 async def receive_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -135,7 +182,7 @@ async def receive_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 
 
 # ──────────────────────────────────────────────
-# Step 3 – Artist
+# Step 4 – Artist
 # ──────────────────────────────────────────────
 
 async def receive_artist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -153,7 +200,7 @@ async def receive_artist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 
 # ──────────────────────────────────────────────
-# Step 4 – Optional comment
+# Step 5 – Optional comment
 # ──────────────────────────────────────────────
 
 async def receive_comment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -175,36 +222,72 @@ async def _forward_to_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     context.user_data["user"] = user
 
     data = context.user_data
-    summary = _submission_summary(data)
+    caption = _submission_caption(data)
     keyboard = _approve_reject_keyboard(user.id)
-
     music_type = data.get("music_type")
+    image_file_id = data.get("image_file_id")
+
+    # Persist full submission so handle_approval can publish without re-parsing
+    context.application.bot_data[str(user.id)] = {
+        "music_type": music_type,
+        "file_id": data.get("file_id"),
+        "link": data.get("link"),
+        "image_file_id": image_file_id,
+        "title": data.get("title"),
+        "artist": data.get("artist"),
+        "comment": data.get("comment"),
+    }
 
     try:
-        if music_type == "audio":
-            await context.bot.send_audio(
+        if image_file_id:
+            # Send cover photo with summary + buttons; attach music as a follow-up
+            await context.bot.send_photo(
                 chat_id=OWNER_CHAT_ID,
-                audio=data["file_id"],
-                caption=summary,
+                photo=image_file_id,
+                caption=caption,
                 parse_mode=ParseMode.HTML,
                 reply_markup=keyboard,
             )
-        elif music_type == "document":
-            await context.bot.send_document(
-                chat_id=OWNER_CHAT_ID,
-                document=data["file_id"],
-                caption=summary,
-                parse_mode=ParseMode.HTML,
-                reply_markup=keyboard,
-            )
-        else:  # link
-            await context.bot.send_message(
-                chat_id=OWNER_CHAT_ID,
-                text=f"{summary}\n\n🔗 <b>Посилання:</b> {data['link']}",
-                parse_mode=ParseMode.HTML,
-                reply_markup=keyboard,
-                disable_web_page_preview=False,
-            )
+            # Attach music file or link as a separate message so owner can preview it
+            if music_type == "audio":
+                await context.bot.send_audio(
+                    chat_id=OWNER_CHAT_ID,
+                    audio=data["file_id"],
+                    caption="🎵 Музичний файл до заявки вище",
+                )
+            elif music_type == "document":
+                await context.bot.send_document(
+                    chat_id=OWNER_CHAT_ID,
+                    document=data["file_id"],
+                    caption="🎵 Музичний файл до заявки вище",
+                )
+            # link is already in the caption — no extra message needed
+        else:
+            # No image: send music/link directly with buttons
+            if music_type == "audio":
+                await context.bot.send_audio(
+                    chat_id=OWNER_CHAT_ID,
+                    audio=data["file_id"],
+                    caption=caption,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard,
+                )
+            elif music_type == "document":
+                await context.bot.send_document(
+                    chat_id=OWNER_CHAT_ID,
+                    document=data["file_id"],
+                    caption=caption,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard,
+                )
+            else:  # link
+                await context.bot.send_message(
+                    chat_id=OWNER_CHAT_ID,
+                    text=caption,
+                    parse_mode=ParseMode.HTML,
+                    reply_markup=keyboard,
+                    disable_web_page_preview=False,
+                )
     except Exception:
         logger.exception("Failed to forward submission to owner")
         await update.message.reply_text(
@@ -227,7 +310,6 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     query = update.callback_query
     await query.answer()
 
-    # Only the owner can use these buttons
     if query.from_user.id != OWNER_CHAT_ID:
         await query.answer("У вас немає прав для цієї дії.", show_alert=True)
         return
@@ -238,14 +320,14 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     original = query.message
 
     if action == "approve":
-        await _publish_to_channel(context, original)
+        await _publish_to_channel(context, submitter_id)
         status_line = "✅ <b>Прийнято та опубліковано на каналі.</b>"
         user_msg = "🎉 Вашу заявку <b>схвалено</b> і опубліковано на каналі!"
     else:
         status_line = "❌ <b>Відхилено.</b>"
         user_msg = "😔 На жаль, ваша заявка <b>не була відібрана</b> цього разу. Дякуємо за участь!"
 
-    # Edit owner message to remove buttons and show status
+    # Remove buttons and mark status on the owner's message
     new_text = (original.caption or original.text or "") + f"\n\n{status_line}"
     try:
         if original.caption is not None:
@@ -265,35 +347,64 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     except Exception:
         logger.warning("Could not notify submitter %s", submitter_id)
 
+    # Clean up stored submission data
+    context.application.bot_data.pop(str(submitter_id), None)
 
-async def _publish_to_channel(context: ContextTypes.DEFAULT_TYPE, owner_msg) -> None:
-    """Re-publish the approved submission to the channel."""
-    caption = owner_msg.caption or owner_msg.text or ""
-    # Strip the approve/reject keyboard caption additions if any
-    clean_caption = caption.split("\n\n✅")[0].split("\n\n❌")[0]
+
+async def _publish_to_channel(context: ContextTypes.DEFAULT_TYPE, submitter_id: int) -> None:
+    """Publish the approved submission to the channel using stored submission data."""
+    data = context.application.bot_data.get(str(submitter_id))
+    if not data:
+        logger.warning("No stored submission data for user %s", submitter_id)
+        return
+
+    caption = _channel_caption(data)
+    music_type = data.get("music_type")
+    image_file_id = data.get("image_file_id")
 
     try:
-        if owner_msg.audio:
-            await context.bot.send_audio(
+        if image_file_id:
+            # Post cover photo with full caption
+            await context.bot.send_photo(
                 chat_id=CHANNEL_ID,
-                audio=owner_msg.audio.file_id,
-                caption=clean_caption,
+                photo=image_file_id,
+                caption=caption,
                 parse_mode=ParseMode.HTML,
             )
-        elif owner_msg.document:
-            await context.bot.send_document(
-                chat_id=CHANNEL_ID,
-                document=owner_msg.document.file_id,
-                caption=clean_caption,
-                parse_mode=ParseMode.HTML,
-            )
+            # Attach the music file below the photo post (links are already in caption)
+            if music_type == "audio":
+                await context.bot.send_audio(
+                    chat_id=CHANNEL_ID,
+                    audio=data["file_id"],
+                )
+            elif music_type == "document":
+                await context.bot.send_document(
+                    chat_id=CHANNEL_ID,
+                    document=data["file_id"],
+                )
         else:
-            await context.bot.send_message(
-                chat_id=CHANNEL_ID,
-                text=clean_caption,
-                parse_mode=ParseMode.HTML,
-                disable_web_page_preview=False,
-            )
+            # No image — post music/link with caption
+            if music_type == "audio":
+                await context.bot.send_audio(
+                    chat_id=CHANNEL_ID,
+                    audio=data["file_id"],
+                    caption=caption,
+                    parse_mode=ParseMode.HTML,
+                )
+            elif music_type == "document":
+                await context.bot.send_document(
+                    chat_id=CHANNEL_ID,
+                    document=data["file_id"],
+                    caption=caption,
+                    parse_mode=ParseMode.HTML,
+                )
+            else:  # link only
+                await context.bot.send_message(
+                    chat_id=CHANNEL_ID,
+                    text=caption,
+                    parse_mode=ParseMode.HTML,
+                    disable_web_page_preview=False,
+                )
     except Exception:
         logger.exception("Failed to publish to channel")
 

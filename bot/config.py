@@ -7,10 +7,11 @@ CHANNEL_ID: str = os.environ["CHANNEL_ID"]  # e.g. "@mychannel" or "-100xxxxxxxx
 # Conversation states
 (
     WAITING_FOR_MUSIC,
+    WAITING_FOR_IMAGE,
     WAITING_FOR_TITLE,
     WAITING_FOR_ARTIST,
     WAITING_FOR_COMMENT,
-) = range(4)
+) = range(5)
 
 ALLOWED_AUDIO_MIME = {
     "audio/mpeg",       # MP3
