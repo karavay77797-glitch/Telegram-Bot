@@ -41,27 +41,27 @@ def _is_allowed_audio(document) -> bool:
 
 def _submission_summary(data: dict) -> str:
     lines = [
-        "🎵 <b>New Music Submission</b>",
+        "🎵 <b>Нова заявка на музику</b>",
         "",
-        f"🎼 <b>Title:</b> {data.get('title', '—')}",
-        f"🎤 <b>Artist:</b> {data.get('artist', '—')}",
+        f"🎼 <b>Назва:</b> {data.get('title', '—')}",
+        f"🎤 <b>Виконавець:</b> {data.get('artist', '—')}",
     ]
     comment = data.get("comment")
     if comment:
-        lines.append(f"💬 <b>Comment:</b> {comment}")
+        lines.append(f"💬 <b>Коментар:</b> {comment}")
     user = data.get("user")
     if user:
         name = user.full_name
         username = f" (@{user.username})" if user.username else ""
-        lines.append(f"👤 <b>From:</b> {name}{username} [<code>{user.id}</code>]")
+        lines.append(f"👤 <b>Від:</b> {name}{username} [<code>{user.id}</code>]")
     return "\n".join(lines)
 
 
 def _approve_reject_keyboard(user_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup([
         [
-            InlineKeyboardButton("✅ Approve", callback_data=f"approve:{user_id}"),
-            InlineKeyboardButton("❌ Reject", callback_data=f"reject:{user_id}"),
+            InlineKeyboardButton("✅ Прийняти", callback_data=f"approve:{user_id}"),
+            InlineKeyboardButton("❌ Відхилити", callback_data=f"reject:{user_id}"),
         ]
     ])
 
@@ -73,10 +73,10 @@ def _approve_reject_keyboard(user_id: int) -> InlineKeyboardMarkup:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
     await update.message.reply_text(
-        "👋 Welcome to the <b>Music Submission Bot</b>!\n\n"
-        "You can submit a music track for consideration on our channel.\n\n"
-        "Please send me the music file (MP3, FLAC, or WAV) "
-        "or paste a music link (SoundCloud, YouTube, Spotify, etc.).",
+        "👋 Ласкаво просимо до <b>Бота для подачі музики</b>!\n\n"
+        "Ви можете надіслати музичний трек для розгляду на нашому каналі.\n\n"
+        "Надішліть музичний файл (MP3, FLAC або WAV) "
+        "або вставте посилання на музику (SoundCloud, YouTube, Spotify тощо).",
         parse_mode=ParseMode.HTML,
     )
     return WAITING_FOR_MUSIC
@@ -104,13 +104,13 @@ async def receive_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
         context.user_data["link"] = message.text.strip()
     else:
         await message.reply_text(
-            "⚠️ Please send an MP3, FLAC, or WAV file, "
-            "or paste a music link (e.g. SoundCloud, YouTube, Spotify)."
+            "⚠️ Будь ласка, надішліть файл MP3, FLAC або WAV, "
+            "або вставте посилання на музику (наприклад, SoundCloud, YouTube, Spotify)."
         )
         return WAITING_FOR_MUSIC
 
     await message.reply_text(
-        "🎼 Got it! Now please enter the <b>track title</b>.",
+        "🎼 Отримано! Тепер введіть <b>назву треку</b>.",
         parse_mode=ParseMode.HTML,
     )
     return WAITING_FOR_TITLE
@@ -123,12 +123,12 @@ async def receive_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 async def receive_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     title = update.message.text.strip()
     if not title:
-        await update.message.reply_text("Please enter a valid track title.")
+        await update.message.reply_text("Будь ласка, введіть коректну назву треку.")
         return WAITING_FOR_TITLE
 
     context.user_data["title"] = title
     await update.message.reply_text(
-        "🎤 Great! Now enter the <b>artist name</b>.",
+        "🎤 Чудово! Тепер введіть <b>ім'я виконавця</b>.",
         parse_mode=ParseMode.HTML,
     )
     return WAITING_FOR_ARTIST
@@ -141,13 +141,13 @@ async def receive_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 async def receive_artist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     artist = update.message.text.strip()
     if not artist:
-        await update.message.reply_text("Please enter a valid artist name.")
+        await update.message.reply_text("Будь ласка, введіть коректне ім'я виконавця.")
         return WAITING_FOR_ARTIST
 
     context.user_data["artist"] = artist
     await update.message.reply_text(
-        "💬 Would you like to add a comment? "
-        "Type it now, or send /skip to submit without one."
+        "💬 Бажаєте додати коментар? "
+        "Напишіть його зараз або надішліть /skip, щоб пропустити."
     )
     return WAITING_FOR_COMMENT
 
@@ -200,7 +200,7 @@ async def _forward_to_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         else:  # link
             await context.bot.send_message(
                 chat_id=OWNER_CHAT_ID,
-                text=f"{summary}\n\n🔗 <b>Link:</b> {data['link']}",
+                text=f"{summary}\n\n🔗 <b>Посилання:</b> {data['link']}",
                 parse_mode=ParseMode.HTML,
                 reply_markup=keyboard,
                 disable_web_page_preview=False,
@@ -208,13 +208,13 @@ async def _forward_to_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) 
     except Exception:
         logger.exception("Failed to forward submission to owner")
         await update.message.reply_text(
-            "⚠️ Something went wrong forwarding your submission. Please try again later."
+            "⚠️ Виникла помилка під час надсилання вашої заявки. Будь ласка, спробуйте пізніше."
         )
         return ConversationHandler.END
 
     await update.message.reply_text(
-        "✅ Your submission has been sent for review!\n"
-        "You'll be notified once the owner makes a decision."
+        "✅ Вашу заявку надіслано на розгляд!\n"
+        "Ви отримаєте сповіщення, коли власник прийме рішення."
     )
     return ConversationHandler.END
 
@@ -229,7 +229,7 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     # Only the owner can use these buttons
     if query.from_user.id != OWNER_CHAT_ID:
-        await query.answer("You are not authorised to do this.", show_alert=True)
+        await query.answer("У вас немає прав для цієї дії.", show_alert=True)
         return
 
     action, submitter_id_str = query.data.split(":", 1)
@@ -239,11 +239,11 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     if action == "approve":
         await _publish_to_channel(context, original)
-        status_line = "✅ <b>Approved and published to the channel.</b>"
-        user_msg = "🎉 Your music submission has been <b>approved</b> and published to the channel!"
+        status_line = "✅ <b>Прийнято та опубліковано на каналі.</b>"
+        user_msg = "🎉 Вашу заявку <b>схвалено</b> і опубліковано на каналі!"
     else:
-        status_line = "❌ <b>Rejected.</b>"
-        user_msg = "😔 Unfortunately your music submission was <b>not selected</b> this time. Thank you for submitting!"
+        status_line = "❌ <b>Відхилено.</b>"
+        user_msg = "😔 На жаль, ваша заявка <b>не була відібрана</b> цього разу. Дякуємо за участь!"
 
     # Edit owner message to remove buttons and show status
     new_text = (original.caption or original.text or "") + f"\n\n{status_line}"
@@ -305,6 +305,6 @@ async def _publish_to_channel(context: ContextTypes.DEFAULT_TYPE, owner_msg) -> 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
     await update.message.reply_text(
-        "Submission cancelled. Send /start whenever you'd like to try again."
+        "Заявку скасовано. Надішліть /start, коли захочете спробувати знову."
     )
     return ConversationHandler.END
