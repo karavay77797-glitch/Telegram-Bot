@@ -14,6 +14,7 @@ def init_db():
     conn = get_connection()
     cur = conn.cursor()
 
+    # Заявки
     cur.execute("""
     CREATE TABLE IF NOT EXISTS submissions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -37,6 +38,27 @@ def init_db():
     )
     """)
 
+    # Опубліковані треки
+    cur.execute("""
+    CREATE TABLE IF NOT EXISTS tracks (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+
+        title TEXT NOT NULL,
+        artist TEXT NOT NULL,
+
+        file_id TEXT,
+        file_unique_id TEXT,
+
+        link TEXT,
+        comment TEXT,
+
+        user_id INTEGER,
+        submission_id INTEGER,
+
+        created_at TEXT
+    )
+    """)
+
     conn.commit()
     conn.close()
 
@@ -47,24 +69,24 @@ def add_submission(data: dict):
 
     cur.execute(
         """
-    INSERT INTO submissions(
-        user_id,
-        username,
-        full_name,
+        INSERT INTO submissions(
+            user_id,
+            username,
+            full_name,
 
-        music_type,
-        file_id,
-        image_file_id,
-        link,
+            music_type,
+            file_id,
+            image_file_id,
+            link,
 
-        title,
-        artist,
-        comment,
+            title,
+            artist,
+            comment,
 
-        created_at
-    )
-    VALUES(?,?,?,?,?,?,?,?,?,?,?)
-    """,
+            created_at
+        )
+        VALUES(?,?,?,?,?,?,?,?,?,?,?)
+        """,
         (
             data["user_id"],
             data["username"],
@@ -92,7 +114,8 @@ def get_submission(submission_id):
     conn = get_connection()
 
     row = conn.execute(
-        "SELECT * FROM submissions WHERE id=?", (submission_id,)
+        "SELECT * FROM submissions WHERE id=?",
+        (submission_id,),
     ).fetchone()
 
     conn.close()
@@ -105,21 +128,18 @@ def approve_submission(submission_id):
 
     conn.execute(
         """
-
         UPDATE submissions
-
         SET status='approved',
-
             approved_at=?
-
         WHERE id=?
-
-    """,
-        (datetime.now().isoformat(), submission_id),
+        """,
+        (
+            datetime.now().isoformat(),
+            submission_id,
+        ),
     )
 
     conn.commit()
-
     conn.close()
 
 
@@ -128,36 +148,28 @@ def reject_submission(submission_id):
 
     conn.execute(
         """
-
         UPDATE submissions
-
         SET status='rejected'
-
         WHERE id=?
-
-    """,
+        """,
         (submission_id,),
     )
 
     conn.commit()
-
     conn.close()
 
 
 def get_pending():
     conn = get_connection()
 
-    rows = conn.execute("""
-
+    rows = conn.execute(
+        """
         SELECT *
-
         FROM submissions
-
         WHERE status='pending'
-
         ORDER BY id ASC
-
-    """).fetchall()
+        """
+    ).fetchall()
 
     conn.close()
 
@@ -167,7 +179,9 @@ def get_pending():
 def get_stats():
     conn = get_connection()
 
-    total = conn.execute("SELECT COUNT(*) FROM submissions").fetchone()[0]
+    total = conn.execute(
+        "SELECT COUNT(*) FROM submissions"
+    ).fetchone()[0]
 
     pending = conn.execute(
         "SELECT COUNT(*) FROM submissions WHERE status='pending'"
@@ -189,3 +203,26 @@ def get_stats():
         "approved": approved,
         "rejected": rejected,
     }
+
+
+# ==========================================================
+# TRACKS
+# ==========================================================
+
+def save_track(data: dict):
+    conn = get_connection()
+    cur = conn.cursor()
+
+    cur.execute(
+        """
+        INSERT INTO tracks(
+            title,
+            artist,
+            file_id,
+            file_unique_id,
+            link,
+            comment,
+            user_id,
+            submission_id,
+            created_at
+        )
