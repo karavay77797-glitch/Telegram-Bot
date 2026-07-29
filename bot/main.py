@@ -58,6 +58,8 @@ logger = logging.getLogger(__name__)
 
 
 async def version(update: Update, context) -> None:
+    logger.info("VERSION COMMAND RECEIVED")
+
     await update.message.reply_text(f"🕯 Witch House Radio Bot\nВерсія: {BOT_VERSION}")
 
 
