@@ -1,6 +1,7 @@
 """Entry point for the Music Submission Telegram Bot."""
 
 import logging
+
 from telegram import Update
 from telegram.ext import (
     Application,
@@ -13,12 +14,16 @@ from telegram.ext import (
 
 from config import (
     BOT_TOKEN,
+    BOT_VERSION,
     WAITING_FOR_MUSIC,
     WAITING_FOR_IMAGE,
     WAITING_FOR_TITLE,
     WAITING_FOR_ARTIST,
     WAITING_FOR_COMMENT,
 )
+
+from database import init_db
+
 from handlers import (
     start,
     receive_music,
@@ -32,40 +37,82 @@ from handlers import (
     handle_approval,
 )
 
+
+# ──────────────────────────────────────────────
+# Logging
+# ──────────────────────────────────────────────
+
 logging.basicConfig(
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
     level=logging.INFO,
 )
+
 logging.getLogger("httpx").setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 
+# ──────────────────────────────────────────────
+# Version command
+# ──────────────────────────────────────────────
+
+
+async def version(update: Update, context) -> None:
+    await update.message.reply_text(f"🕯 Witch House Radio Bot\nВерсія: {BOT_VERSION}")
+
+
+# ──────────────────────────────────────────────
+# Main
+# ──────────────────────────────────────────────
+
+
 def main() -> None:
+    # Initialize database
+    init_db()
+
+    # Create bot application
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # ── Submission conversation ──────────────────────────────────
+    # ──────────────────────────────────────────
+    # Music submission conversation
+    # ──────────────────────────────────────────
+
     conv = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
             WAITING_FOR_MUSIC: [
                 MessageHandler(
-                    filters.AUDIO | filters.Document.ALL | filters.TEXT & ~filters.COMMAND,
+                    filters.AUDIO
+                    | filters.Document.AUDIO
+                    | (filters.TEXT & ~filters.COMMAND),
                     receive_music,
-                ),
+                )
             ],
             WAITING_FOR_IMAGE: [
                 CommandHandler("skip", skip_image),
-                MessageHandler(filters.PHOTO | filters.Document.IMAGE, receive_image),
+                MessageHandler(
+                    filters.PHOTO | filters.Document.IMAGE,
+                    receive_image,
+                ),
             ],
             WAITING_FOR_TITLE: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_title),
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND,
+                    receive_title,
+                )
             ],
             WAITING_FOR_ARTIST: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_artist),
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND,
+                    receive_artist,
+                )
             ],
             WAITING_FOR_COMMENT: [
                 CommandHandler("skip", skip_comment),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, receive_comment),
+                MessageHandler(
+                    filters.TEXT & ~filters.COMMAND,
+                    receive_comment,
+                ),
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
@@ -74,12 +121,21 @@ def main() -> None:
 
     app.add_handler(conv)
 
-    # ── Owner approve / reject buttons ──────────────────────────
-    app.add_handler(CallbackQueryHandler(handle_approval, pattern=r"^(approve|reject):\d+$"))
+    # Version
+    app.add_handler(CommandHandler("version", version))
 
-    logger.info("Bot is starting — polling for updates…")
+    # Owner buttons
+    app.add_handler(
+        CallbackQueryHandler(handle_approval, pattern=r"^(approve|reject):\d+$")
+    )
+
+    logger.info("🕯 WITCH HOUSE RADIO BOT v%s STARTED", BOT_VERSION)
+
+    # Start polling
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 
+
+# ──────────────────────────────────────────────
 
 if __name__ == "__main__":
     main()

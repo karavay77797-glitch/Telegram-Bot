@@ -21,6 +21,15 @@ from config import (
     ALLOWED_AUDIO_EXT,
 )
 
+from database import (
+    add_submission,
+    get_submission,
+    approve_submission,
+    reject_submission,
+    get_pending,
+    get_stats,
+)
+
 logger = logging.getLogger(__name__)
 
 
