@@ -26,7 +26,6 @@ from database import init_db
 
 from handlers import (
     start,
-    pending
     receive_music,
     receive_image,
     skip_image,
@@ -36,6 +35,8 @@ from handlers import (
     skip_comment,
     cancel,
     handle_approval,
+    stats,
+    pending,
 )
 
 

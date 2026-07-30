@@ -7,30 +7,23 @@ from telegram import (
     InlineKeyboardButton,
     InlineKeyboardMarkup,
 )
-
 from telegram.ext import (
     ContextTypes,
     ConversationHandler,
 )
-
 from telegram.constants import ParseMode
-
 
 from config import (
     OWNER_CHAT_ID,
     CHANNEL_ID,
-
     WAITING_FOR_MUSIC,
     WAITING_FOR_IMAGE,
     WAITING_FOR_TITLE,
     WAITING_FOR_ARTIST,
     WAITING_FOR_COMMENT,
-
     ALLOWED_AUDIO_MIME,
     ALLOWED_AUDIO_EXT,
 )
-
-
 from database import (
     add_submission,
     get_submission,
@@ -41,7 +34,6 @@ from database import (
     save_track,
 )
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -49,137 +41,64 @@ logger = logging.getLogger(__name__)
 # Helpers
 # ──────────────────────────────────────────────
 
-
 def _is_allowed_audio(document) -> bool:
     if document is None:
         return False
-
     mime = (document.mime_type or "").lower()
-
     if mime in ALLOWED_AUDIO_MIME:
         return True
-
     name = (document.file_name or "").lower()
-
-    return any(
-        name.endswith(ext)
-        for ext in ALLOWED_AUDIO_EXT
-    )
+    return any(name.endswith(ext) for ext in ALLOWED_AUDIO_EXT)
 
 
 def _submission_caption(data: dict) -> str:
-
-    lines = [
-        "🎵 <b>Нова заявка на музику</b>",
-        "",
-    ]
-
-    lines.append(
-        f"🎵 <b>Трек:</b> {data.get('title', '—')}"
-    )
-
-    lines.append(
-        f"👤 <b>Виконавець:</b> {data.get('artist', '—')}"
-    )
-
-
+    lines = ["🎵 <b>Нова заявка на музику</b>", ""]
+    lines.append(f"🎵 <b>Трек:</b> {data.get('title', '—')}")
+    lines.append(f"👤 <b>Виконавець:</b> {data.get('artist', '—')}")
     if data.get("comment"):
-        lines.append(
-            f"💬 <b>Коментар:</b> {data['comment']}"
-        )
-
-
+        lines.append(f"💬 <b>Коментар:</b> {data['comment']}")
     if data.get("link"):
-        lines.append(
-            f"🔗 <b>Посилання:</b> {data['link']}"
-        )
-
-
-    lines.append(
-        f"👤 <b>Від:</b> {data.get('full_name', '—')}"
-    )
-
-
+        lines.append(f"🔗 <b>Посилання:</b> {data['link']}")
+    lines.append(f"👤 <b>Від:</b> {data.get('full_name', '—')}")
     if data.get("username"):
-        lines.append(
-            f"📱 @{data['username']}"
-        )
-
-
-    lines.append(
-        f"🆔 <code>{data.get('user_id')}</code>"
-    )
-
-
+        lines.append(f"📱 @{data['username']}")
+    lines.append(f"🆔 <code>{data.get('user_id')}</code>")
     return "\n".join(lines)
 
 
-
 def _channel_caption(data: dict) -> str:
-
     lines = [
         f"🎵 <b>{data.get('title', '—')}</b>",
         f"👤 {data.get('artist', '—')}",
     ]
-
-
     if data.get("comment"):
-        lines.append(
-            f"💬 {data['comment']}"
-        )
-
-
+        lines.append(f"💬 {data['comment']}")
     if data.get("link"):
-        lines.append(
-            f"🔗 {data['link']}"
-        )
-
-
+        lines.append(f"🔗 {data['link']}")
     return "\n".join(lines)
 
 
-
-def _approve_reject_keyboard(submission_id: int):
-
-    return InlineKeyboardMarkup(
+def _approve_reject_keyboard(submission_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup([
         [
-            [
-                InlineKeyboardButton(
-                    "✅ Прийняти",
-                    callback_data=f"approve:{submission_id}",
-                ),
-
-                InlineKeyboardButton(
-                    "❌ Відхилити",
-                    callback_data=f"reject:{submission_id}",
-                ),
-            ]
+            InlineKeyboardButton("✅ Прийняти", callback_data=f"approve:{submission_id}"),
+            InlineKeyboardButton("❌ Відхилити", callback_data=f"reject:{submission_id}"),
         ]
-    )
+    ])
 
 
 # ──────────────────────────────────────────────
-# Start
+# /start
 # ──────────────────────────────────────────────
 
-
-async def start(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-) -> int:
-
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
-
-
     await update.message.reply_text(
         "👋 Ласкаво просимо до "
         "<b>Witch House Radio Submit Bot</b>!\n\n"
-        "Надішліть музичний файл "
-        "(MP3, FLAC, WAV) або посилання.",
+        "Надішліть музичний файл (MP3, FLAC, WAV) або посилання.",
         parse_mode=ParseMode.HTML,
     )
-
-
     return WAITING_FOR_MUSIC
 
 
@@ -187,309 +106,131 @@ async def start(
 # Step 1 – Music file or link
 # ──────────────────────────────────────────────
 
-    # ──────────────────────────────────────────────
-    # Step 1 — Receive music
-    # ──────────────────────────────────────────────
+async def receive_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    message = update.message
 
-
-    async def receive_music(
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-    ) -> int:
-
-        message = update.message
-
-
-        if message.audio:
-
-            context.user_data["music_type"] = "audio"
-            context.user_data["file_id"] = message.audio.file_id
-
-
-        elif message.document and _is_allowed_audio(message.document):
-
-            context.user_data["music_type"] = "document"
-            context.user_data["file_id"] = message.document.file_id
-
-
-        elif message.text:
-
-            context.user_data["music_type"] = "link"
-            context.user_data["link"] = message.text.strip()
-
-
-        else:
-
-            await message.reply_text(
-                "⚠️ Надішліть MP3, FLAC, WAV або посилання."
-            )
-
-            return WAITING_FOR_MUSIC
-
-
-
+    if message.audio:
+        context.user_data["music_type"] = "audio"
+        context.user_data["file_id"] = message.audio.file_id
+    elif message.document and _is_allowed_audio(message.document):
+        context.user_data["music_type"] = "document"
+        context.user_data["file_id"] = message.document.file_id
+    elif message.text:
+        context.user_data["music_type"] = "link"
+        context.user_data["link"] = message.text.strip()
+    else:
         await message.reply_text(
-            "🖼 Надішліть обкладинку треку "
-            "або напишіть /skip.",
-            parse_mode=ParseMode.HTML,
+            "⚠️ Надішліть MP3, FLAC, WAV або посилання."
         )
+        return WAITING_FOR_MUSIC
+
+    await message.reply_text(
+        "🖼 Надішліть обкладинку треку або напишіть /skip.",
+        parse_mode=ParseMode.HTML,
+    )
+    return WAITING_FOR_IMAGE
 
 
+# ──────────────────────────────────────────────
+# Step 2 – Cover image (optional)
+# ──────────────────────────────────────────────
+
+async def receive_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    message = update.message
+
+    if message.photo:
+        context.user_data["image_file_id"] = message.photo[-1].file_id
+    elif message.document:
+        context.user_data["image_file_id"] = message.document.file_id
+    else:
+        await message.reply_text("⚠️ Надішліть картинку або /skip.")
         return WAITING_FOR_IMAGE
 
+    await message.reply_text("🎼 Введіть назву треку.")
+    return WAITING_FOR_TITLE
 
 
-
-    # ──────────────────────────────────────────────
-    # Step 2 — Image
-    # ──────────────────────────────────────────────
-
-
-    async def receive_image(
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-    ) -> int:
+async def skip_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data.pop("image_file_id", None)
+    await update.message.reply_text("🎼 Введіть назву треку.")
+    return WAITING_FOR_TITLE
 
 
-        message = update.message
+# ──────────────────────────────────────────────
+# Step 3 – Title
+# ──────────────────────────────────────────────
 
-
-        if message.photo:
-
-            context.user_data["image_file_id"] = (
-                message.photo[-1].file_id
-            )
-
-
-        elif message.document:
-
-            context.user_data["image_file_id"] = (
-                message.document.file_id
-            )
-
-
-        else:
-
-            await message.reply_text(
-                "⚠️ Надішліть картинку або /skip."
-            )
-
-            return WAITING_FOR_IMAGE
-
-
-
-        await message.reply_text(
-            "🎼 Введіть назву треку."
-        )
-
-
+async def receive_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    title = update.message.text.strip()
+    if not title:
+        await update.message.reply_text("Введіть назву треку.")
         return WAITING_FOR_TITLE
+    context.user_data["title"] = title
+    await update.message.reply_text("🎤 Введіть виконавця.")
+    return WAITING_FOR_ARTIST
 
 
+# ──────────────────────────────────────────────
+# Step 4 – Artist
+# ──────────────────────────────────────────────
 
-
-    async def skip_image(
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-    ) -> int:
-
-
-        context.user_data.pop(
-            "image_file_id",
-            None
-        )
-
-
-        await update.message.reply_text(
-            "🎼 Введіть назву треку."
-        )
-
-
-        return WAITING_FOR_TITLE
-
-
-
-
-
-    # ──────────────────────────────────────────────
-    # Step 3 — Title
-    # ──────────────────────────────────────────────
-
-
-    async def receive_title(
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-    ) -> int:
-
-
-        title = update.message.text.strip()
-
-
-        if not title:
-
-            await update.message.reply_text(
-                "Введіть назву треку."
-            )
-
-            return WAITING_FOR_TITLE
-
-
-
-        context.user_data["title"] = title
-
-
-
-        await update.message.reply_text(
-            "🎤 Введіть виконавця."
-        )
-
-
+async def receive_artist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    artist = update.message.text.strip()
+    if not artist:
+        await update.message.reply_text("Введіть ім'я виконавця.")
         return WAITING_FOR_ARTIST
-
-
-
-
-
-    # ──────────────────────────────────────────────
-    # Step 4 — Artist
-    # ──────────────────────────────────────────────
-
-
-    async def receive_artist(
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-    ) -> int:
-
-
-        artist = update.message.text.strip()
-
-
-        if not artist:
-
-            await update.message.reply_text(
-                "Введіть ім'я виконавця."
-            )
-
-            return WAITING_FOR_ARTIST
-
-
-
-        context.user_data["artist"] = artist
-
-
-
-        await update.message.reply_text(
-            "💬 Додайте коментар або /skip."
-        )
-
-
-        return WAITING_FOR_COMMENT
-
-
-
-
-
-    # ──────────────────────────────────────────────
-    # Step 5 — Comment
-    # ──────────────────────────────────────────────
-
-
-    async def receive_comment(
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-    ) -> int:
-
-
-        context.user_data["comment"] = (
-            update.message.text.strip()
-        )
-
-
-        return await _forward_to_owner(
-            update,
-            context
-        )
-
-
-
-
-    async def skip_comment(
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-    ) -> int:
-
-
-        context.user_data.pop(
-            "comment",
-            None
-        )
-
-
-        return await _forward_to_owner(
-            update,
-            context
-        )
+    context.user_data["artist"] = artist
+    await update.message.reply_text("💬 Додайте коментар або /skip.")
+    return WAITING_FOR_COMMENT
 
 
 # ──────────────────────────────────────────────
-# Send submission to owner
+# Step 5 – Comment (optional)
 # ──────────────────────────────────────────────
 
-
-async def _forward_to_owner(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-) -> int:
+async def receive_comment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data["comment"] = update.message.text.strip()
+    return await _forward_to_owner(update, context)
 
 
+async def skip_comment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data.pop("comment", None)
+    return await _forward_to_owner(update, context)
+
+
+# ──────────────────────────────────────────────
+# Forward submission to owner
+# ──────────────────────────────────────────────
+
+async def _forward_to_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     user = update.effective_user
-
     data = context.user_data
 
-
-    submission_id = add_submission(
-        {
-            "user_id": user.id,
-            "username": user.username,
-            "full_name": user.full_name,
-
-            "music_type": data.get("music_type"),
-            "file_id": data.get("file_id"),
-            "image_file_id": data.get("image_file_id"),
-            "link": data.get("link"),
-
-            "title": data.get("title"),
-            "artist": data.get("artist"),
-            "comment": data.get("comment"),
-        }
-    )
-
+    submission_id = add_submission({
+        "user_id": user.id,
+        "username": user.username,
+        "full_name": user.full_name,
+        "music_type": data.get("music_type"),
+        "file_id": data.get("file_id"),
+        "image_file_id": data.get("image_file_id"),
+        "link": data.get("link"),
+        "title": data.get("title"),
+        "artist": data.get("artist"),
+        "comment": data.get("comment"),
+    })
 
     submission_data = {
         "user_id": user.id,
         "username": user.username,
         "full_name": user.full_name,
-
-        **data
+        **data,
     }
 
-
-    caption = _submission_caption(
-        submission_data
-    )
-
-
-    keyboard = _approve_reject_keyboard(
-        submission_id
-    )
-
+    caption = _submission_caption(submission_data)
+    keyboard = _approve_reject_keyboard(submission_id)
 
     try:
-
-
         if data.get("image_file_id"):
-
-
             await context.bot.send_photo(
                 chat_id=OWNER_CHAT_ID,
                 photo=data["image_file_id"],
@@ -497,30 +238,20 @@ async def _forward_to_owner(
                 parse_mode=ParseMode.HTML,
                 reply_markup=keyboard,
             )
-
-
             if data.get("music_type") == "audio":
-
                 await context.bot.send_audio(
                     chat_id=OWNER_CHAT_ID,
                     audio=data["file_id"],
+                    caption="🎵 Музичний файл до заявки вище",
                 )
-
-
             elif data.get("music_type") == "document":
-
                 await context.bot.send_document(
                     chat_id=OWNER_CHAT_ID,
                     document=data["file_id"],
+                    caption="🎵 Музичний файл до заявки вище",
                 )
-
-
-
         else:
-
-
             if data.get("music_type") == "audio":
-
                 await context.bot.send_audio(
                     chat_id=OWNER_CHAT_ID,
                     audio=data["file_id"],
@@ -528,10 +259,7 @@ async def _forward_to_owner(
                     parse_mode=ParseMode.HTML,
                     reply_markup=keyboard,
                 )
-
-
             elif data.get("music_type") == "document":
-
                 await context.bot.send_document(
                     chat_id=OWNER_CHAT_ID,
                     document=data["file_id"],
@@ -539,396 +267,162 @@ async def _forward_to_owner(
                     parse_mode=ParseMode.HTML,
                     reply_markup=keyboard,
                 )
-
-
             else:
-
                 await context.bot.send_message(
                     chat_id=OWNER_CHAT_ID,
                     text=caption,
                     parse_mode=ParseMode.HTML,
                     reply_markup=keyboard,
                 )
-
-
-
     except Exception:
-
-        logger.exception(
-            "Failed sending submission"
-        )
-
-
-        await update.message.reply_text(
-            "⚠️ Помилка відправки заявки."
-        )
-
+        logger.exception("Failed sending submission")
+        await update.message.reply_text("⚠️ Помилка відправки заявки.")
         return ConversationHandler.END
 
-
-
-    await update.message.reply_text(
-        "✅ Заявку відправлено на розгляд!"
-    )
-
-
+    await update.message.reply_text("✅ Заявку відправлено на розгляд!")
     context.user_data.clear()
-
-
     return ConversationHandler.END
-
-
-
 
 
 # ──────────────────────────────────────────────
 # Approve / Reject
 # ──────────────────────────────────────────────
 
-
-async def handle_approval(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-) -> None:
-
-
+async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     query = update.callback_query
-
     await query.answer()
 
-
-
     if query.from_user.id != OWNER_CHAT_ID:
-
-        await query.answer(
-            "Немає доступу",
-            show_alert=True
-        )
-
+        await query.answer("Немає доступу", show_alert=True)
         return
-
-
 
     action, id_str = query.data.split(":")
-
-
     submission_id = int(id_str)
 
-
-    submission = get_submission(
-        submission_id
-    )
-
-
+    submission = get_submission(submission_id)
     if not submission:
-
-        await query.answer(
-            "Заявку не знайдено",
-            show_alert=True
-        )
-
+        await query.answer("Заявку не знайдено", show_alert=True)
         return
-
-
 
     submitter_id = submission["user_id"]
 
-
-
     if action == "approve":
-
-
-        approve_submission(
-            submission_id
-        )
-
-
-        await _publish_to_channel(
-            context,
-            submission
-        )
-
-
-        status = (
-            "\n\n✅ <b>СХВАЛЕНО"
-            " та опубліковано</b>"
-        )
-
-
-        message_to_user = (
-            "🎉 Ваш трек схвалено "
-            "та опубліковано!"
-        )
-
-
-
+        approve_submission(submission_id)
+        await _publish_to_channel(context, submission)
+        status = "\n\n✅ <b>СХВАЛЕНО та опубліковано</b>"
+        message_to_user = "🎉 Ваш трек схвалено та опубліковано!"
     else:
-
-
-        reject_submission(
-            submission_id
-        )
-
-
-        status = (
-            "\n\n❌ <b>ВІДХИЛЕНО</b>"
-        )
-
-
-        message_to_user = (
-            "😔 Ваш трек цього разу "
-            "не пройшов відбір."
-        )
-
-
+        reject_submission(submission_id)
+        status = "\n\n❌ <b>ВІДХИЛЕНО</b>"
+        message_to_user = "😔 Ваш трек цього разу не пройшов відбір."
 
     try:
-
         await query.message.edit_caption(
-            caption=(
-                query.message.caption
-                + status
-            ),
+            caption=(query.message.caption or "") + status,
             parse_mode=ParseMode.HTML,
         )
-
-
     except Exception:
-
         pass
-
-
 
     try:
-
-        await context.bot.send_message(
-            chat_id=submitter_id,
-            text=message_to_user,
-        )
-
+        await context.bot.send_message(chat_id=submitter_id, text=message_to_user)
     except Exception:
-
         pass
 
+
 # ──────────────────────────────────────────────
-# Publish approved submission
+# Publish to channel
 # ──────────────────────────────────────────────
 
-
-async def _publish_to_channel(
-    context: ContextTypes.DEFAULT_TYPE,
-    submission
-):
-
+async def _publish_to_channel(context: ContextTypes.DEFAULT_TYPE, submission) -> None:
     data = dict(submission)
-
-
     caption = _channel_caption(data)
 
-
     try:
-
         if data.get("image_file_id"):
-
-
             await context.bot.send_photo(
                 chat_id=CHANNEL_ID,
                 photo=data["image_file_id"],
                 caption=caption,
                 parse_mode=ParseMode.HTML,
             )
-
-
             if data.get("music_type") == "audio":
-
-                await context.bot.send_audio(
-                    chat_id=CHANNEL_ID,
-                    audio=data["file_id"],
-                )
-
-
+                await context.bot.send_audio(chat_id=CHANNEL_ID, audio=data["file_id"])
             elif data.get("music_type") == "document":
-
-                await context.bot.send_document(
-                    chat_id=CHANNEL_ID,
-                    document=data["file_id"],
-                )
-
-
-
+                await context.bot.send_document(chat_id=CHANNEL_ID, document=data["file_id"])
         else:
-
-
             if data.get("music_type") == "audio":
-
                 await context.bot.send_audio(
-                    chat_id=CHANNEL_ID,
-                    audio=data["file_id"],
-                    caption=caption,
-                    parse_mode=ParseMode.HTML,
+                    chat_id=CHANNEL_ID, audio=data["file_id"],
+                    caption=caption, parse_mode=ParseMode.HTML,
                 )
-
-
             elif data.get("music_type") == "document":
-
                 await context.bot.send_document(
-                    chat_id=CHANNEL_ID,
-                    document=data["file_id"],
-                    caption=caption,
-                    parse_mode=ParseMode.HTML,
+                    chat_id=CHANNEL_ID, document=data["file_id"],
+                    caption=caption, parse_mode=ParseMode.HTML,
                 )
-
-
             else:
-
                 await context.bot.send_message(
-                    chat_id=CHANNEL_ID,
-                    text=caption,
-                    parse_mode=ParseMode.HTML,
+                    chat_id=CHANNEL_ID, text=caption, parse_mode=ParseMode.HTML,
                 )
 
-
-
-        save_track(
-            {
-                "title": data["title"],
-                "artist": data["artist"],
-
-                "file_id": data.get("file_id"),
-
-                "link": data.get("link"),
-
-                "comment": data.get("comment"),
-
-                "user_id": data.get("user_id"),
-
-                "submission_id": data.get("id"),
-            }
-        )
-
-
-        logger.info(
-            "Published submission %s",
-            data.get("id")
-        )
-
+        save_track({
+            "title": data["title"],
+            "artist": data["artist"],
+            "file_id": data.get("file_id"),
+            "link": data.get("link"),
+            "comment": data.get("comment"),
+            "user_id": data.get("user_id"),
+            "submission_id": data.get("id"),
+        })
+        logger.info("Published submission %s", data.get("id"))
 
     except Exception:
-
-        logger.exception(
-            "Publish error"
-        )
-
-
-
+        logger.exception("Publish error")
 
 
 # ──────────────────────────────────────────────
-# /stats
+# /stats  (owner only)
 # ──────────────────────────────────────────────
 
-
-async def stats(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-
+async def stats(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user.id != OWNER_CHAT_ID:
         return
-
-
-
     data = get_stats()
-
-
-    text = (
-        "📊 <b>Witch House Radio Bot</b>\n\n"
-
-        f"🎵 Всього заявок: {data['total']}\n"
-
-        f"⏳ Очікують: {data['pending']}\n"
-
-        f"✅ Прийнято: {data['approved']}\n"
-
-        f"❌ Відхилено: {data['rejected']}"
-    )
-
-
     await update.message.reply_text(
-        text,
+        "📊 <b>Witch House Radio Bot</b>\n\n"
+        f"🎵 Всього заявок: {data['total']}\n"
+        f"⏳ Очікують: {data['pending']}\n"
+        f"✅ Прийнято: {data['approved']}\n"
+        f"❌ Відхилено: {data['rejected']}",
         parse_mode=ParseMode.HTML,
     )
 
 
-
-
-
 # ──────────────────────────────────────────────
-# /pending
+# /pending  (owner only)
 # ──────────────────────────────────────────────
 
-
-async def pending(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-):
-
-
+async def pending(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if update.effective_user.id != OWNER_CHAT_ID:
         return
-
-
-
     rows = get_pending()
-
-
     if not rows:
-
-        await update.message.reply_text(
-            "📭 Немає очікуючих заявок."
-        )
-
+        await update.message.reply_text("📭 Немає очікуючих заявок.")
         return
-
-
-
     text = "⏳ <b>Очікують:</b>\n\n"
-
-
     for row in rows[:10]:
-
-        text += (
-            f"#{row['id']} "
-            f"🎵 {row['artist']} - "
-            f"{row['title']}\n"
-        )
-
-
-    await update.message.reply_text(
-        text,
-        parse_mode=ParseMode.HTML,
-    )
+        text += f"#{row['id']} 🎵 {row['artist']} — {row['title']}\n"
+    await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
 
 # ──────────────────────────────────────────────
-# Cancel
+# /cancel
 # ──────────────────────────────────────────────
 
-
-async def cancel(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-) -> int:
-
-
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
-
-
     await update.message.reply_text(
-        "❌ Заявку скасовано.\n"
-        "Надішліть /start щоб почати знову."
+        "❌ Заявку скасовано.\nНадішліть /start щоб почати знову."
     )
-
-
     return ConversationHandler.END
