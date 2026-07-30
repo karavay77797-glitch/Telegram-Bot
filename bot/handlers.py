@@ -141,8 +141,6 @@ def _approve_reject_keyboard(submission_id: int):
 # ======================================================
 # START
 # ======================================================
-
-
 async def start(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
@@ -150,18 +148,33 @@ async def start(
 
     keyboard = [
         [
-            KeyboardButton("🎵 Надіслати трек"),
+            InlineKeyboardButton(
+                "🎵 Надіслати трек",
+                callback_data="send_track"
+            )
         ],
         [
-            KeyboardButton("📢 Канал"),
-            KeyboardButton("ℹ️ Допомога"),
-        ],
+            InlineKeyboardButton(
+                "📢 Канал",
+                url="https://t.me/witchhouse_radio"
+            ),
+            InlineKeyboardButton(
+                "ℹ️ Допомога",
+                callback_data="help"
+            )
+        ]
     ]
 
-    reply_markup = ReplyKeyboardMarkup(
-        keyboard,
-        resize_keyboard=True
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(
+        "🕯 WITCH HOUSE RADIO\n\n"
+        "☽ Welcome to the Void ☾\n\n"
+        "Надішліть свій трек для розгляду.",
+        reply_markup=reply_markup,
     )
+
+    return WAITING_FOR_MUSIC
 
     await update.message.reply_text(
         "╔════════════════════╗\n"
