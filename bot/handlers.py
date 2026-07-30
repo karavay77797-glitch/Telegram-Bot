@@ -3,156 +3,223 @@
 import logging
 
 from telegram import (
-    Update,
-    InlineKeyboardButton,
-    InlineKeyboardMarkup,
-)
+            Update,
+            InlineKeyboardButton,
+            InlineKeyboardMarkup,
+        )
+
 from telegram.ext import (
-    ContextTypes,
-    ConversationHandler,
-)
+            ContextTypes,
+            ConversationHandler,
+        )
+
 from telegram.constants import ParseMode
 
+
 from config import (
-    OWNER_CHAT_ID,
-    CHANNEL_ID,
-    WAITING_FOR_MUSIC,
-    WAITING_FOR_IMAGE,
-    WAITING_FOR_TITLE,
-    WAITING_FOR_ARTIST,
-    WAITING_FOR_COMMENT,
-    ALLOWED_AUDIO_MIME,
-    ALLOWED_AUDIO_EXT,
-)
+            OWNER_CHAT_ID,
+            CHANNEL_ID,
+
+            WAITING_FOR_MUSIC,
+            WAITING_FOR_IMAGE,
+            WAITING_FOR_TITLE,
+            WAITING_FOR_ARTIST,
+            WAITING_FOR_COMMENT,
+
+            ALLOWED_AUDIO_MIME,
+            ALLOWED_AUDIO_EXT,
+        )
+
+
 from database import (
-    add_submission,
-    get_submission,
-    approve_submission,
-    reject_submission,
-    get_pending,
-    get_stats,
-    save_track,
-)
+            add_submission,
+            get_submission,
+            approve_submission,
+            reject_submission,
+            get_pending,
+            get_stats,
+            save_track,
+        )
+
 
 logger = logging.getLogger(__name__)
 
 
-# ──────────────────────────────────────────────
-# Helpers
-# ──────────────────────────────────────────────
+        # ======================================================
+        # HELPERS
+        # ======================================================
+
 
 def _is_allowed_audio(document) -> bool:
-    if document is None:
-        return False
-    mime = (document.mime_type or "").lower()
-    if mime in ALLOWED_AUDIO_MIME:
-        return True
-    name = (document.file_name or "").lower()
-    return any(name.endswith(ext) for ext in ALLOWED_AUDIO_EXT)
+
+            if document is None:
+                return False
+
+            mime = (document.mime_type or "").lower()
+
+            if mime in ALLOWED_AUDIO_MIME:
+                return True
+
+            name = (document.file_name or "").lower()
+
+            return any(
+                name.endswith(ext)
+                for ext in ALLOWED_AUDIO_EXT
+            )
+
 
 
 def _submission_caption(data: dict) -> str:
-    lines = ["🎵 <b>Нова заявка на музику</b>", ""]
-    lines.append(f"🎵 <b>Трек:</b> {data.get('title', '—')}")
-    lines.append(f"👤 <b>Виконавець:</b> {data.get('artist', '—')}")
-    if data.get("comment"):
-        lines.append(f"💬 <b>Коментар:</b> {data['comment']}")
-    if data.get("link"):
-        lines.append(f"🔗 <b>Посилання:</b> {data['link']}")
-    lines.append(f"👤 <b>Від:</b> {data.get('full_name', '—')}")
-    if data.get("username"):
-        lines.append(f"📱 @{data['username']}")
-    lines.append(f"🆔 <code>{data.get('user_id')}</code>")
-    return "\n".join(lines)
+
+            lines = [
+                "🎵 <b>Нова заявка на музику</b>",
+                "",
+                f"🎵 <b>Трек:</b> {data.get('title', '—')}",
+                f"👤 <b>Виконавець:</b> {data.get('artist', '—')}",
+            ]
+
+
+            if data.get("comment"):
+                lines.append(
+                    f"💬 <b>Коментар:</b> {data['comment']}"
+                )
+
+
+            if data.get("link"):
+                lines.append(
+                    f"🔗 <b>Посилання:</b> {data['link']}"
+                )
+
+
+            lines.extend(
+                [
+                    "",
+                    f"👤 <b>Від:</b> {data.get('full_name','—')}",
+                    f"🆔 <code>{data.get('user_id')}</code>",
+                ]
+            )
+
+
+            return "\n".join(lines)
+
 
 
 def _channel_caption(data: dict) -> str:
-    lines = [
-        f"🎵 <b>{data.get('title', '—')}</b>",
-        f"👤 {data.get('artist', '—')}",
-    ]
-    if data.get("comment"):
-        lines.append(f"💬 {data['comment']}")
-    if data.get("link"):
-        lines.append(f"🔗 {data['link']}")
-    return "\n".join(lines)
+
+            lines = [
+                f"🎵 <b>{data.get('title','—')}</b>",
+                f"👤 {data.get('artist','—')}",
+            ]
 
 
-def _approve_reject_keyboard(submission_id: int) -> InlineKeyboardMarkup:
-    return InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("✅ Прийняти", callback_data=f"approve:{submission_id}"),
-            InlineKeyboardButton("❌ Відхилити", callback_data=f"reject:{submission_id}"),
-        ]
-    ])
+            if data.get("comment"):
+                lines.append(
+                    f"💬 {data['comment']}"
+                )
 
 
-# ──────────────────────────────────────────────
-# /start
-# ──────────────────────────────────────────────
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    context.user_data.clear()
-    await update.message.reply_text(
-        "👋 Ласкаво просимо до "
-        "<b>Witch House Radio Submit Bot</b>!\n\n"
-        "Надішліть музичний файл (MP3, FLAC, WAV) або посилання.",
-        parse_mode=ParseMode.HTML,
-    )
-    return WAITING_FOR_MUSIC
+            if data.get("link"):
+                lines.append(
+                    f"🔗 {data['link']}"
+                )
 
 
-# ──────────────────────────────────────────────
-# Step 1 – Music file or link
-# ──────────────────────────────────────────────
+            return "\n".join(lines)
 
-async def receive_music(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    message = update.message
 
-    if message.audio:
-        context.user_data["music_type"] = "audio"
-        context.user_data["file_id"] = message.audio.file_id
-    elif message.document and _is_allowed_audio(message.document):
-        context.user_data["music_type"] = "document"
-        context.user_data["file_id"] = message.document.file_id
-    elif message.text:
-        context.user_data["music_type"] = "link"
-        context.user_data["link"] = message.text.strip()
-    else:
+
+def _approve_reject_keyboard(submission_id: int):
+
+            return InlineKeyboardMarkup(
+                [
+                    [
+                        InlineKeyboardButton(
+                            "✅ Прийняти",
+                            callback_data=f"approve:{submission_id}",
+                        ),
+
+                        InlineKeyboardButton(
+                            "❌ Відхилити",
+                            callback_data=f"reject:{submission_id}",
+                        ),
+                    ]
+                ]
+            )
+
+
+        # ======================================================
+        # START
+        # ======================================================
+
+
+async def start(
+            update: Update,
+            context: ContextTypes.DEFAULT_TYPE
+        ) -> int:
+
+            context.user_data.clear()
+
+
+            await update.message.reply_text(
+                "👋 Ласкаво просимо до "
+                "<b>Witch House Radio Submit Bot</b>!\n\n"
+                "Надішліть музичний файл "
+                "(MP3, FLAC, WAV) або посилання.",
+                parse_mode=ParseMode.HTML,
+            )
+
+
+            return WAITING_FOR_MUSIC
+    # ──────────────────────────────────────────────
+    # Step 1 – Music file or link
+    # ──────────────────────────────────────────────
+
+
+async def receive_music(
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE
+    ) -> int:
+
+        message = update.message
+
+        if message.audio:
+
+            context.user_data["music_type"] = "audio"
+            context.user_data["file_id"] = message.audio.file_id
+
+
+        elif message.document and _is_allowed_audio(message.document):
+
+            context.user_data["music_type"] = "document"
+            context.user_data["file_id"] = message.document.file_id
+
+
+        elif message.text:
+
+            context.user_data["music_type"] = "link"
+            context.user_data["link"] = message.text.strip()
+
+
+        else:
+
+            await message.reply_text(
+                "⚠️ Надішліть MP3, FLAC, WAV або посилання."
+            )
+
+            return WAITING_FOR_MUSIC
+
+
         await message.reply_text(
-            "⚠️ Надішліть MP3, FLAC, WAV або посилання."
+            "🖼 Надішліть обкладинку треку "
+            "або напишіть /skip.",
+            parse_mode=ParseMode.HTML,
         )
-        return WAITING_FOR_MUSIC
-
-    await message.reply_text(
-        "🖼 Надішліть обкладинку треку або напишіть /skip.",
-        parse_mode=ParseMode.HTML,
-    )
-    return WAITING_FOR_IMAGE
 
 
-# ──────────────────────────────────────────────
-# Step 2 – Cover image (optional)
-# ──────────────────────────────────────────────
-
-async def receive_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    message = update.message
-
-    if message.photo:
-        context.user_data["image_file_id"] = message.photo[-1].file_id
-    elif message.document:
-        context.user_data["image_file_id"] = message.document.file_id
-    else:
-        await message.reply_text("⚠️ Надішліть картинку або /skip.")
         return WAITING_FOR_IMAGE
-
-    await message.reply_text("🎼 Введіть назву треку.")
-    return WAITING_FOR_TITLE
-
-
-async def skip_image(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+        : ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.pop("image_file_id", None)
-    await update.message.reply_text("🎼 Введіть назву треку.")
+    await update.message.reply_text("🎼 Введіазву треку.")
     return WAITING_FOR_TITLE
 
 
@@ -174,7 +241,7 @@ async def receive_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> i
 # Step 4 – Artist
 # ──────────────────────────────────────────────
 
-async def receive_artist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def receive_artist(update: Update, context: extTypes.DEFAULT_TYPE) -> int:
     artist = update.message.text.strip()
     if not artist:
         await update.message.reply_text("Введіть ім'я виконавця.")
@@ -186,7 +253,7 @@ async def receive_artist(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
 # ──────────────────────────────────────────────
 # Step 5 – Comment (optional)
-# ──────────────────────────────────────────────
+# ──────────────────────────────────────────
 
 async def receive_comment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["comment"] = update.message.text.strip()
@@ -203,7 +270,7 @@ async def skip_comment(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 # ──────────────────────────────────────────────
 
 async def _forward_to_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
-    user = update.effective_user
+    user =ate.effective_user
     data = context.user_data
 
     submission_id = add_submission({
@@ -226,7 +293,7 @@ async def _forward_to_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) 
         **data,
     }
 
-    caption = _submission_caption(submission_data)
+    caption ubmission_caption(submission_data)
     keyboard = _approve_reject_keyboard(submission_id)
 
     try:
@@ -235,7 +302,7 @@ async def _forward_to_owner(update: Update, context: ContextTypes.DEFAULT_TYPE) 
                 chat_id=OWNER_CHAT_ID,
                 photo=data["image_file_id"],
                 caption=caption,
-                parse_mode=ParseMode.HTML,
+            parse_mode=ParseMode.HTML,
                 reply_markup=keyboard,
             )
             if data.get("music_type") == "audio":
