@@ -126,6 +126,10 @@ def main() -> None:
         allow_reentry=True,
     )
 
+    app.add_handler(
+        CallbackQueryHandler(button_handler)
+    )
+
     app.add_handler(conv)
 
     app.add_handler(CommandHandler("version", version))
