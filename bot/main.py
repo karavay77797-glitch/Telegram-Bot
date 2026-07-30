@@ -12,7 +12,7 @@ from telegram.ext import (
     filters,
 )
 
-from config import (
+from bot.config import (
     BOT_TOKEN,
     BOT_VERSION,
     WAITING_FOR_MUSIC,
@@ -22,9 +22,9 @@ from config import (
     WAITING_FOR_COMMENT,
 )
 
-from database import init_db
+from bot.database import init_db
 
-from handlers import (
+from bot.handlers import (
     start,
     receive_music,
     receive_image,
@@ -56,17 +56,17 @@ logger = logging.getLogger(__name__)
 # Version command
 # ──────────────────────────────────────────────
 
-
 async def version(update: Update, context) -> None:
     logger.info("VERSION COMMAND RECEIVED")
 
-    await update.message.reply_text(f"🕯 Witch House Radio Bot\nВерсія: {BOT_VERSION}")
+    await update.message.reply_text(
+        f"🕯 Witch House Radio Bot\nВерсія: {BOT_VERSION}"
+    )
 
 
 # ──────────────────────────────────────────────
 # Main
 # ──────────────────────────────────────────────
-
 
 def main() -> None:
     # Initialize database
@@ -75,9 +75,7 @@ def main() -> None:
     # Create bot application
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # ──────────────────────────────────────────
     # Music submission conversation
-    # ──────────────────────────────────────────
 
     conv = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
@@ -90,6 +88,7 @@ def main() -> None:
                     receive_music,
                 )
             ],
+
             WAITING_FOR_IMAGE: [
                 CommandHandler("skip", skip_image),
                 MessageHandler(
@@ -97,18 +96,21 @@ def main() -> None:
                     receive_image,
                 ),
             ],
+
             WAITING_FOR_TITLE: [
                 MessageHandler(
                     filters.TEXT & ~filters.COMMAND,
                     receive_title,
                 )
             ],
+
             WAITING_FOR_ARTIST: [
                 MessageHandler(
                     filters.TEXT & ~filters.COMMAND,
                     receive_artist,
                 )
             ],
+
             WAITING_FOR_COMMENT: [
                 CommandHandler("skip", skip_comment),
                 MessageHandler(
@@ -117,24 +119,33 @@ def main() -> None:
                 ),
             ],
         },
+
         fallbacks=[CommandHandler("cancel", cancel)],
         allow_reentry=True,
     )
 
     app.add_handler(conv)
 
-    # Version
+    # Version command
     app.add_handler(CommandHandler("version", version))
 
     # Owner buttons
     app.add_handler(
-        CallbackQueryHandler(handle_approval, pattern=r"^(approve|reject):\d+$")
+        CallbackQueryHandler(
+            handle_approval,
+            pattern=r"^(approve|reject):\d+$"
+        )
     )
 
-    logger.info("🕯 WITCH HOUSE RADIO BOT v%s STARTED", BOT_VERSION)
+    logger.info(
+        "🕯 WITCH HOUSE RADIO BOT v%s STARTED",
+        BOT_VERSION
+    )
 
     # Start polling
-    app.run_polling(allowed_updates=Update.ALL_TYPES)
+    app.run_polling(
+        allowed_updates=Update.ALL_TYPES
+    )
 
 
 # ──────────────────────────────────────────────
