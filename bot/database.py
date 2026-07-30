@@ -226,3 +226,36 @@ def save_track(data: dict):
             submission_id,
             created_at
         )
+        VALUES(?,?,?,?,?,?,?,?,?)
+        """,
+        (
+            data["title"],
+            data["artist"],
+            data.get("file_id"),
+            data.get("file_unique_id"),
+            data.get("link"),
+            data.get("comment"),
+            data.get("user_id"),
+            data.get("submission_id"),
+            datetime.now().isoformat(),
+        ),
+    )
+
+    conn.commit()
+    conn.close()
+
+
+def get_tracks():
+    conn = get_connection()
+
+    rows = conn.execute(
+        """
+        SELECT *
+        FROM tracks
+        ORDER BY id DESC
+        """
+    ).fetchall()
+
+    conn.close()
+
+    return rows
