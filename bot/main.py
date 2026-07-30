@@ -4,6 +4,7 @@ import logging
 
 from telegram import Update
 from telegram.ext import (
+    CallbackQueryHandler,
     Application,
     CommandHandler,
     MessageHandler,
@@ -37,6 +38,7 @@ from handlers import (
     handle_approval,
     stats,
     pending,
+    button_handler,
 )
 
 
@@ -130,12 +132,16 @@ def main() -> None:
 
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("pending", pending))
-    
+
     app.add_handler(
         CallbackQueryHandler(
             handle_approval,
             pattern=r"^(approve|reject):\d+$"
         )
+    )
+
+    app.add_handler(
+        CallbackQueryHandler(button_handler)
     )
 
     logger.info(
@@ -146,7 +152,6 @@ def main() -> None:
     app.run_polling(
         allowed_updates=Update.ALL_TYPES
     )
-
 
 if __name__ == "__main__":
     main()

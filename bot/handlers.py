@@ -141,23 +141,48 @@ def _approve_reject_keyboard(submission_id: int):
 # ======================================================
 
 
-async def start(
-    update: Update,
-    context: ContextTypes.DEFAULT_TYPE
-) -> int:
+    async def start(
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE
+    ) -> int:
 
-    context.user_data.clear()
+        keyboard = [
+            [
+                KeyboardButton("🎵 Надіслати трек"),
+            ],
+            [
+                KeyboardButton("📢 Канал"),
+                KeyboardButton("ℹ️ Допомога"),
+            ],
+        ]
 
-    await update.message.reply_text(
-        "👋 Ласкаво просимо до "
-        "<b>Witch House Radio Submit Bot</b>!\n\n"
-        "Надішліть музичний файл "
-        "(MP3, FLAC, WAV) або посилання.",
-        parse_mode=ParseMode.HTML,
-    )
+        reply_markup = ReplyKeyboardMarkup(
+            keyboard,
+            resize_keyboard=True
+        )
 
-    return WAITING_FOR_MUSIC
+        await update.message.reply_text(
+            "╔════════════════════╗\n"
+            "        🕯 WITCH HOUSE RADIO\n"
+            "             Submit Bot\n"
+            "╚════════════════════╝\n\n"
+            "☽ Welcome to the Void ☾\n\n"
+            "Become part of the darkness.\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🎵 Надішліть:\n"
+            "• MP3\n"
+            "• FLAC\n"
+            "• WAV\n"
+            "• або посилання на трек\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "The best Witch House.\n"
+            "Dark Ambient.\n"
+            "Underground.",
+            reply_markup=reply_markup,
+            parse_mode=ParseMode.HTML,
+        )
 
+        return WAITING_FOR_MUSIC
 
 # ======================================================
 # STEP 1 — MUSIC
@@ -618,3 +643,41 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         "❌ Заявку скасовано.\nНадішліть /start щоб почати знову."
     )
     return ConversationHandler.END
+
+async def button_handler(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "send_track":
+        await query.message.reply_text(
+            "🎵 Надішліть ваш трек (MP3, FLAC, WAV або посилання):"
+        )
+
+    elif query.data == "help":
+        await query.message.reply_text(
+            "ℹ️ Допомога:\n\n"
+            "Надішліть трек — бот прийме його на розгляд."
+        )
+
+async def button_handler(
+    update: Update,
+    context: ContextTypes.DEFAULT_TYPE
+):
+
+    query = update.callback_query
+    await query.answer()
+
+    if query.data == "send_track":
+        await query.message.reply_text(
+            "🎵 Надішліть ваш трек (MP3, FLAC, WAV або посилання):"
+        )
+
+    elif query.data == "help":
+        await query.message.reply_text(
+            "ℹ️ Допомога:\n\n"
+            "Надішліть трек — бот прийме його на розгляд."
+        )
