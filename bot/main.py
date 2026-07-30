@@ -12,7 +12,7 @@ from telegram.ext import (
     filters,
 )
 
-from bot.config import (
+from config import (
     BOT_TOKEN,
     BOT_VERSION,
     WAITING_FOR_MUSIC,
@@ -22,9 +22,9 @@ from bot.config import (
     WAITING_FOR_COMMENT,
 )
 
-from bot.database import init_db
+from database import init_db
 
-from bot.handlers import (
+from handlers import (
     start,
     receive_music,
     receive_image,
