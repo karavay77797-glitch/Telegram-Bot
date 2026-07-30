@@ -75,8 +75,6 @@ def main() -> None:
     # Create bot application
     app = Application.builder().token(BOT_TOKEN).build()
 
-    # Music submission conversation
-
     conv = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -126,10 +124,8 @@ def main() -> None:
 
     app.add_handler(conv)
 
-    # Version command
     app.add_handler(CommandHandler("version", version))
 
-    # Owner buttons
     app.add_handler(
         CallbackQueryHandler(
             handle_approval,
@@ -142,13 +138,10 @@ def main() -> None:
         BOT_VERSION
     )
 
-    # Start polling
     app.run_polling(
         allowed_updates=Update.ALL_TYPES
     )
 
-
-# ──────────────────────────────────────────────
 
 if __name__ == "__main__":
     main()
