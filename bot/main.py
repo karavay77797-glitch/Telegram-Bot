@@ -26,6 +26,7 @@ from database import init_db
 
 from handlers import (
     start,
+    pending
     receive_music,
     receive_image,
     skip_image,
@@ -126,6 +127,9 @@ def main() -> None:
 
     app.add_handler(CommandHandler("version", version))
 
+    app.add_handler(CommandHandler("stats", stats))
+    app.add_handler(CommandHandler("pending", pending))
+    
     app.add_handler(
         CallbackQueryHandler(
             handle_approval,
