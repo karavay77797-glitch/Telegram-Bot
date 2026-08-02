@@ -4,12 +4,11 @@ import logging
 
 from telegram import Update
 from telegram.ext import (
-    CallbackQueryHandler,
     Application,
-    CommandHandler,
-    MessageHandler,
     CallbackQueryHandler,
+    CommandHandler,
     ConversationHandler,
+    MessageHandler,
     filters,
 )
 
@@ -40,7 +39,6 @@ from handlers import (
     pending,
     button_handler,
 )
-
 
 # ──────────────────────────────────────────────
 # Logging
@@ -126,17 +124,15 @@ def main() -> None:
         allow_reentry=True,
     )
 
-    app.add_handler(
-        CallbackQueryHandler(button_handler)
-    )
-
+    # Conversation
     app.add_handler(conv)
 
+    # Commands
     app.add_handler(CommandHandler("version", version))
-
     app.add_handler(CommandHandler("stats", stats))
     app.add_handler(CommandHandler("pending", pending))
 
+    # Кнопки Прийняти / Відхилити
     app.add_handler(
         CallbackQueryHandler(
             handle_approval,
@@ -144,6 +140,7 @@ def main() -> None:
         )
     )
 
+    # Інші inline-кнопки
     app.add_handler(
         CallbackQueryHandler(button_handler)
     )
@@ -156,6 +153,7 @@ def main() -> None:
     app.run_polling(
         allowed_updates=Update.ALL_TYPES
     )
+
 
 if __name__ == "__main__":
     main()
