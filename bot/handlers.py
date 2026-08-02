@@ -520,9 +520,11 @@ async def _forward_to_owner(
 # Approve / Reject
 # ──────────────────────────────────────────────
 
-async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    query = update.callback_query
-    await query.answer()
+    async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        logger.info("BUTTON PRESSED: %s", update.callback_query.data)
+
+        query = update.callback_query
+        await query.answer()
 
     if query.from_user.id != OWNER_CHAT_ID:
         await query.answer("Немає доступу", show_alert=True)
