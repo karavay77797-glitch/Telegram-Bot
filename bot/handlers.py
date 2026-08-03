@@ -176,34 +176,11 @@ async def start(
 
     return WAITING_FOR_MUSIC
 
-    await update.message.reply_text(
-        "╔════════════════════╗\n"
-        "        🕯 WITCH HOUSE RADIO\n"
-        "             Submit Bot\n"
-        "╚════════════════════╝\n\n"
-        "☽ Welcome to the Void ☾\n\n"
-        "Become part of the darkness.\n\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "🎵 Надішліть:\n"
-        "• MP3\n"
-        "• FLAC\n"
-        "• WAV\n"
-        "• або посилання на трек\n\n"
-        "━━━━━━━━━━━━━━━━━━━━\n\n"
-        "The best Witch House.\n"
-        "Dark Ambient.\n"
-        "Underground.",
-        reply_markup=reply_markup,
-        parse_mode=ParseMode.HTML,
-    )
-
-    return WAITING_FOR_MUSIC
+    
 
 # ======================================================
 # STEP 1 — MUSIC
 # ======================================================
-
-
 async def receive_music(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
@@ -216,18 +193,22 @@ async def receive_music(
         context.user_data["music_type"] = "audio"
         context.user_data["file_id"] = message.audio.file_id
 
-
     elif message.document and _is_allowed_audio(message.document):
 
         context.user_data["music_type"] = "document"
         context.user_data["file_id"] = message.document.file_id
 
-
     elif message.text:
+        text = message.text.strip()
 
-        context.user_data["music_type"] = "link"
-        context.user_data["link"] = message.text.strip()
-
+        if text.startswith(("http://", "https://")):
+            context.user_data["music_type"] = "link"
+            context.user_data["link"] = text
+        else:
+            await message.reply_text(
+                "⚠️ Надішліть правильне посилання (https://...) або MP3, FLAC, WAV."
+            )
+            return WAITING_FOR_MUSIC
 
     else:
 
@@ -237,16 +218,12 @@ async def receive_music(
 
         return WAITING_FOR_MUSIC
 
-
     await message.reply_text(
-        "🖼 Надішліть обкладинку треку "
-        "або напишіть /skip.",
+        "🖼 Надішліть обкладинку треку або напишіть /skip.",
         parse_mode=ParseMode.HTML,
     )
 
-
     return WAITING_FOR_IMAGE
-
 # ======================================================
 # STEP 2 — IMAGE
 # ======================================================
@@ -261,7 +238,11 @@ async def receive_image(
     if message.photo:
         context.user_data["image_file_id"] = message.photo[-1].file_id
 
-    elif message.document:
+    elif (
+        message.document
+        and message.document.mime_type
+        and message.document.mime_type.startswith("image/")
+    ):
         context.user_data["image_file_id"] = message.document.file_id
 
     else:
@@ -275,7 +256,6 @@ async def receive_image(
     )
 
     return WAITING_FOR_TITLE
-
 
 # ======================================================
 # STEP 2 — SKIP IMAGE
@@ -556,7 +536,7 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             parse_mode=ParseMode.HTML,
         )
     except Exception:
-        pass
+        logger.exception("Failed to edit approval message")
 
     try:
         await context.bot.send_message(
@@ -564,7 +544,7 @@ async def handle_approval(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             text=message_to_user,
         )
     except Exception:
-        pass
+        logger.exception("Failed to notify submitter")
 
 # ──────────────────────────────────────────────
 # Publish to channel
