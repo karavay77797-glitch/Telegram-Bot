@@ -635,29 +635,45 @@ async def pending(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 # ──────────────────────────────────────────────
 # /cancel
 # ──────────────────────────────────────────────
-
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data.clear()
+
     await update.message.reply_text(
         "❌ Заявку скасовано.\nНадішліть /start щоб почати знову."
     )
+
     return ConversationHandler.END
 
+
+# ──────────────────────────────────────────────
+# Buttons
+# ──────────────────────────────────────────────
 async def button_handler(
     update: Update,
     context: ContextTypes.DEFAULT_TYPE
-):
+) -> int:
 
     query = update.callback_query
     await query.answer()
 
     if query.data == "send_track":
+
         await query.message.reply_text(
             "🎵 Надішліть ваш трек (MP3, FLAC, WAV або посилання):"
         )
 
+        return WAITING_FOR_MUSIC
+
     elif query.data == "help":
+
         await query.message.reply_text(
             "ℹ️ Допомога:\n\n"
-            "Надішліть трек — бот прийме його на розгляд."
+            "1️⃣ Надішліть трек\n"
+            "2️⃣ Додайте обкладинку\n"
+            "3️⃣ Вкажіть виконавця\n"
+            "4️⃣ Очікуйте рішення"
         )
+
+        return WAITING_FOR_MUSIC
+
+    return ConversationHandler.END
