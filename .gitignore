@@ -1,49 +1,100 @@
-# See https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files for more about ignoring files.
+# ==================================================
+# Python
+# ==================================================
 
-# compiled output
-dist
-tmp
-out-tsc
-*.tsbuildinfo
-.expo
-.expo-shared
+__pycache__/
+*.py[cod]
+*$py.class
 
-# dependencies
-node_modules
+.venv/
+venv/
+env/
 
+# Python cache
+.pytest_cache/
+.mypy_cache/
+
+
+# ==================================================
+# Telegram Bot
+# ==================================================
+
+# Database
+bot/submissions.db
+*.sqlite
+*.sqlite3
+
+# Environment variables
+.env
+
+
+# ==================================================
+# Replit
+# ==================================================
+
+.cache/
+.local/
+
+
+# ==================================================
 # IDEs and editors
-/.idea
-.project
-.classpath
-.c9/
-*.launch
-.settings/
-*.sublime-workspace
+# ==================================================
 
-# IDE - VSCode
 .vscode/*
 !.vscode/settings.json
 !.vscode/tasks.json
 !.vscode/launch.json
 !.vscode/extensions.json
 
-# misc
-/.sass-cache
-/connect.lock
-/coverage
-/libpeerconnection.log
+.idea/
+*.sublime-workspace
+
+.project
+.classpath
+.c9/
+*.launch
+.settings/
+
+
+# ==================================================
+# Node / Frontend leftovers
+# ==================================================
+
+node_modules/
+dist/
+tmp/
+out-tsc/
+*.tsbuildinfo
+.expo
+.expo-shared
+
+
+# ==================================================
+# Logs
+# ==================================================
+
+*.log
 npm-debug.log
 yarn-error.log
-testem.log
-/typings
 
+
+# ==================================================
 # System Files
+# ==================================================
+
 .DS_Store
 Thumbs.db
 
+
+# ==================================================
+# Other
+# ==================================================
+
+.coverage
+coverage/
+.sass-cache/
+connect.lock
+.typings
+
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
-
-# Replit
-.cache/
-.local/
