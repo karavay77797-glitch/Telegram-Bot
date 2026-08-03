@@ -40,9 +40,6 @@ from handlers import (
     button_handler,
 )
 
-# ──────────────────────────────────────────────
-# Logging
-# ──────────────────────────────────────────────
 
 logging.basicConfig(
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -54,10 +51,6 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
-# ──────────────────────────────────────────────
-# Version command
-# ──────────────────────────────────────────────
-
 async def version(update: Update, context) -> None:
     logger.info("VERSION COMMAND RECEIVED")
 
@@ -66,19 +59,18 @@ async def version(update: Update, context) -> None:
     )
 
 
-# ──────────────────────────────────────────────
-# Main
-# ──────────────────────────────────────────────
-
 def main() -> None:
-    # Initialize database
+
     init_db()
 
-    # Create bot application
     app = Application.builder().token(BOT_TOKEN).build()
 
+
     conv = ConversationHandler(
-        entry_points=[CommandHandler("start", start)],
+        entry_points=[
+            CommandHandler("start", start),
+        ],
+
         states={
             WAITING_FOR_MUSIC: [
                 MessageHandler(
@@ -116,23 +108,34 @@ def main() -> None:
                 MessageHandler(
                     filters.TEXT & ~filters.COMMAND,
                     receive_comment,
-                ),
+                )
             ],
         },
 
-        fallbacks=[CommandHandler("cancel", cancel)],
+        fallbacks=[
+            CommandHandler("cancel", cancel)
+        ],
+
         allow_reentry=True,
     )
 
-    # Conversation
+
     app.add_handler(conv)
 
-    # Commands
-    app.add_handler(CommandHandler("version", version))
-    app.add_handler(CommandHandler("stats", stats))
-    app.add_handler(CommandHandler("pending", pending))
 
-    # Кнопки Прийняти / Відхилити
+    app.add_handler(
+        CommandHandler("version", version)
+    )
+
+    app.add_handler(
+        CommandHandler("stats", stats)
+    )
+
+    app.add_handler(
+        CommandHandler("pending", pending)
+    )
+
+
     app.add_handler(
         CallbackQueryHandler(
             handle_approval,
@@ -140,15 +143,17 @@ def main() -> None:
         )
     )
 
-    # Інші inline-кнопки
+
     app.add_handler(
         CallbackQueryHandler(button_handler)
     )
+
 
     logger.info(
         "🕯 WITCH HOUSE RADIO BOT v%s STARTED",
         BOT_VERSION
     )
+
 
     app.run_polling(
         allowed_updates=Update.ALL_TYPES
